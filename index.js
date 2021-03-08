@@ -180,6 +180,10 @@ function validateState() {
         return 'PRIVATE_KEY key missing from .env - you must fix';
     } else if (!CAPTCHA_SECRET) {
         return 'CAPTCHA_SECRET key missing from .env - you must fix';
+    } else if (!NANOBOX_USER) {
+        return 'NANOBOX_USER key missing from .env - you must fix';
+    } else if (!NANOBOX_PASSWORD) {
+        return 'NANOBOX_PASSWORD key missing from .env - you must fix';
     }
 
     return null;
