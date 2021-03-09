@@ -5,17 +5,23 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "serve": "node index.js"
+    "serve": "node index.js",
+    "start": "nodemon index.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@nanobox/nano-client": "^2.0.0",
+    "@nanobox/nano-client": "latest",
     "axios": "^0.21.1",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "form-data": "^4.0.0"
   },
   "devDependencies": {
-    "aws-sdk": "^2.858.0"
+    "aws-sdk": "^2.858.0",
+    "express": "^4.17.1",
+    "lambda-local": "^1.7.4",
+    "nodemon": "^2.0.7"
   }
 }
