@@ -1,5 +1,6 @@
 const AWS = require('aws-sdk');
 const nano_client = require('@nanobox/nano-client');
+const { NANO } = require('@nanobox/nano-client/dist/models');
 const axios = require('axios');
 const FormData = require('form-data');
 
@@ -80,8 +81,42 @@ async function send(event, params) {
     });
   }
 
+  const accountInfo = await c.updateWalletAccount({
+    address: acc.address,
+    publicKey: acc.publicKey,
+    privateKey: acc.privateKey,
+  });
+
+  console.log(`accountInfo: ${accountInfo}`);
+
+  if (!accountInfo) {
+    return response(500, {
+      error: `unable to retrieve account info for address sending Nano`,
+    });
+  }
+
+  console.log(`account balance: ${accountInfo.balance.asNumber}`);
+
+  if (accountInfo.balance.asNumber === 0) {
+    return response(400, {
+      error: `wallet balance is zero`,
+    });
+  }
+
   const ts = Date.now();
-  const res = await c.sendMax(acc, params.toAddress);
+
+  let res;
+  if (params.amount) {
+    console.log(`amount to send: ${params.amount.asString}`);
+    if (params.amount.asString === '0') {
+      return response(400, {
+        error: 'Unable to send zero amount of Nano',
+      });
+    }
+    res = await c.send(acc, params.toAddress, params.amount);
+  } else {
+    res = await c.sendMax(acc, params.toAddress);
+  }
   if (!res) {
     return response(500, {
       error: `unable to send from ${params.fromAddress} to ${params.toAddress}`,
@@ -118,6 +153,7 @@ async function getFromFaucet(event, params) {
     return response(500, { error: `unable to retrieve faucet account info` });
   }
 
+  console.log(NANO.fromNumber(accountInfo.balance.asNumber * FAUCET_PERCENT));
   const res = await c.send(
     {
       address: FAUCET_ADDRESS,
@@ -125,7 +161,7 @@ async function getFromFaucet(event, params) {
       privateKey: PRIVATE_KEY,
     },
     params.toAddress,
-    accountInfo.balance * FAUCET_PERCENT
+    NANO.fromNumber(accountInfo.balance.asNumber * FAUCET_PERCENT)
   );
   if (!res) {
     return response(500, {
