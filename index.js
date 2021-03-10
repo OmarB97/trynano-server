@@ -233,10 +233,7 @@ exports.handler = async function (event) {
 
   const token = event.headers['x-recaptcha'];
   const captchaResponse = token ? await validateCaptcha(token) : undefined;
-  if (
-    !(captchaResponse && captchaResponse.success) &&
-    !(event.headers['bpc'] === '123')
-  ) {
+  if (!(captchaResponse && captchaResponse.success)) {
     return response(403, { error: 'access denied: invalid recaptcha token' });
   }
 
@@ -252,6 +249,11 @@ exports.handler = async function (event) {
 function response(code, object) {
   return {
     statusCode: code,
+    headers: {
+      'Access-Control-Allow-Headers': 'Content-Type, X-Recaptcha, X-Api-Key',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'OPTIONS,POST,GET',
+    },
     body: JSON.stringify(object),
   };
 }
