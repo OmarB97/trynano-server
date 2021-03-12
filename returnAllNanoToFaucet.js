@@ -1,5 +1,9 @@
 const AWS = require('aws-sdk');
 const nano_client = require('@nanobox/nano-client');
+<<<<<<< Updated upstream
+=======
+const { NANO } = require('@nanobox/nano-client/dist/models');
+>>>>>>> Stashed changes
 
 require('dotenv').config();
 
@@ -45,7 +49,7 @@ exports.handler = async (event) => {
 
     // get all accounts with ts > 7 days (1 minute for dev testing)
 
-    const res = getAllEligibleAccounts();
+    const res = await getAllEligibleAccounts();
 
     // const res = await c.send(
     //   {
@@ -80,19 +84,57 @@ exports.handler = async (event) => {
  *
  * @returns List of eligible Nano accounts with their info: walletID, publicKey, and privateKey
  */
-async function getAllEligibleAccounts(address) {
+async function getAllEligibleAccounts() {
   const res = await ddb
-    .query({
+    .scan({
       TableName: DDB_WALLET_TABLE_NAME,
-      KeyConditionExpression: 'expirationTs < :ts_now',
+      ProjectionExpression:
+        'walletID, publicKey, privateKey, balance, expirationTs',
+      FilterExpression: 'expirationTs < :ts_now AND balance > :z',
       ExpressionAttributeValues: {
         ':ts_now': { N: Date.now().toString() },
+        ':z': { N: '0' },
       },
     })
     .promise();
 
   console.log(`res: ${JSON.stringify(res)}`);
-  return res;
+
+  if (!res.Items) {
+    return null;
+  }
+
+  const sendResults = [];
+  res.Items.forEach(async (item) => {
+    // wallets.push(AWS.DynamoDB.Converter.unmarshall(item));
+    const walletDBData = AWS.DynamoDB.Converter.unmarshall(item);
+
+    const accountInfo = await c.updateWalletAccount({
+      address: walletDBData.walletID,
+      publicKey: walletDBData.publicKey,
+      privateKey: walletDBData.privateKey,
+    });
+
+    if (!accountInfo) {
+      return response(500, { error: `unable to retrieve faucet account info` });
+    }
+
+    console.log(`accountInfo: ${JSON.stringify(accountInfo)}`);
+
+    // now send all the nano in this wallet to the faucet
+    sendResults.push(
+      await c.send(accountInfo, FAUCET_ADDRESS, accountInfo.balance)
+    );
+  });
+
+  //   const updatedBalance = sendRes.balance.asString;
+  // console.log(`updatedBalance: ${updatedBalance}`);
+
+  await Promise.all(sendResults);
+  console.log(`sendResults: ${JSON.stringify(sendResults)}`);
+
+  //   console.log(`wallets: ${JSON.stringify(wallets)}`);
+  return true;
 
   //   const wallet = AWS.DynamoDB.Converter.unmarshall(res.Item);
   //   const nanoAccount = {
