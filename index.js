@@ -220,19 +220,11 @@ async function getFromFaucet(event, params) {
     });
   }
 
-  console.log(event);
-  console.log(`user ip: ${event.requestContext.http.sourceIp}`);
   // Reject the user's faucet request if not eligible
   const faucetEligibilityStatus = await checkFaucetEligibility(
     event.requestContext.http.sourceIp
   );
-  console.log(
-    `after checked faucet eligibility, res: ${JSON.stringify(
-      faucetEligibilityStatus
-    )}`
-  );
   if (!faucetEligibilityStatus.isEligible) {
-    console.log('not eligible for faucet');
     return response(400, {
       error: faucetEligibilityStatus.reason,
     });
@@ -365,7 +357,6 @@ async function checkFaucetEligibility(ipAddress) {
     })
     .promise();
   if (!res.Item) {
-    console.log(`before put new item`);
     await ddb
       .putItem({
         TableName: DDB_FAUCET_IP_HISTORY_TABLE_NAME,
@@ -377,7 +368,6 @@ async function checkFaucetEligibility(ipAddress) {
         }),
       })
       .promise();
-    console.log(`after put new item`);
     return {
       isEligible: true,
     };
