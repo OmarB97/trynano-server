@@ -17,7 +17,7 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
 
-const WALLET_EXPIRATION_TIME_MS = 300000; // 5 minutes in miliseconds
+const WALLET_EXPIRATION_TIME_MS = 60000; // 1 minute in miliseconds
 // const WALLET_EXPIRATION_TIME_MS = 604800000; // 7 days in miliseconds
 
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
@@ -102,6 +102,7 @@ async function createWallets(_event, _params) {
           expirationTs: Date.now() + WALLET_EXPIRATION_TIME_MS,
           privateKey: wallet.privateKey,
           publicKey: wallet.publicKey,
+          balance: 0,
         }),
       })
       .promise();
@@ -175,9 +176,17 @@ async function send(_event, params) {
       error: `unable to send from ${params.fromAddress} to ${params.toAddress}`,
     });
   }
+
+  // update balance in DynamoDB
+  const updatedBalance = res.balance.asString;
+  await updateNanoBalanceInDB(
+    params.fromAddress,
+    updatedBalance
+  );
+
   return response(200, {
     address: params.fromAddress,
-    balance: res.balance.asString,
+    balance: updatedBalance,
     sendTimestamp: ts,
   });
 }
@@ -196,9 +205,17 @@ async function receive(_event, params) {
   }
 
   const res = await c.receive(acc);
+
+  // update balance in DynamoDB after receive
+  const updatedBalance = res.account.balance.asString;
+  await updateNanoBalanceInDB(
+    params.receiveAddress,
+    updatedBalance
+  );
+
   return response(200, {
     address: params.receiveAddress,
-    balance: res.account.balance.asString,
+    balance: updatedBalance,
     resolvedCount: res.resolvedCount,
   });
 }
@@ -339,6 +356,32 @@ async function loadNanoAccountFromDB(address) {
     privateKey: wallet.privateKey,
   };
   return nanoAccount;
+}
+
+/**
+ * Updates the balance for a TryNano wallet in DynamoDB.
+ *
+ * @param {string} address the address of the nano account
+ * @param {string} updatedBalance the updated wallet balance
+ */
+async function updateNanoBalanceInDB(address, updatedBalance) {
+  await ddb
+    .updateItem({
+      TableName: DDB_WALLET_TABLE_NAME,
+      Key: {
+        walletID: {
+          S: address,
+        },
+      },
+      UpdateExpression: 'SET balance = :u',
+      ExpressionAttributeValues: {
+        ':u': {
+          N: updatedBalance,
+        },
+      },
+      ReturnValues: 'UPDATED_NEW',
+    })
+    .promise();
 }
 
 /**
