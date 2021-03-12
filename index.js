@@ -14,8 +14,13 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
   NANOBOX_USER = process.env.NANOBOX_USER,
   NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
 
-const DDB_TABLE_NAME = 'FaucetWallets';
+const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
+const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
 const FAUCET_PERCENT = 0.00015;
+const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
+const FAUCET_THROTTLE_DURATION_SECONDS = 600;
+const FAUCET_INVOKE_LIMIT = 10;
+const FAUCET_RESET_TIME_HOURS = 24;
 
 const c = new nano_client.NanoClient({
   url: 'https://api.nanobox.cc',
@@ -68,6 +73,7 @@ exports.handler = async function (event) {
     }
     return await apiMethod(event, params);
   } catch (err) {
+    console.log(`caught error: ${err.message}`);
     return response(500, { error: 'Server error, please try again later!' });
   }
 };
@@ -75,21 +81,22 @@ exports.handler = async function (event) {
 /**
  * Generates two brand new TryNano wallets and logs the wallet info to DynamoDB.
  *
- * @param {APIGatewayProxyEvent} event the API Gateway event data
- * @param {Object} params the http request body data
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
+ * @param {Object} _params the http request body data
  * @returns a list of two generated wallets with their corresponding address, privateKey, and balance (starts at 0)
  */
-async function createWallets(event, params) {
+async function createWallets(_event, _params) {
   let wallets = [];
   for (let i = 0; i < 2; i++) {
     const wallet = c.generateWallet().accounts[0];
     await ddb
       .putItem({
-        TableName: DDB_TABLE_NAME,
+        TableName: DDB_WALLET_TABLE_NAME,
         Item: AWS.DynamoDB.Converter.marshall({
           walletID: wallet.address,
           privateKey: wallet.privateKey,
           publicKey: wallet.publicKey,
+          ts: Date.now(),
         }),
       })
       .promise();
@@ -108,11 +115,11 @@ async function createWallets(event, params) {
 /**
  * Sends either the max account balance or a specified amount of nano from one nano account to another.
  *
- * @param {APIGatewayProxyEvent} event the API Gateway event data
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
  * @param {Object} params the http request body data
  * @returns the sender address, updated sender account balance , and starting timestamp of the send transaction
  */
-async function send(event, params) {
+async function send(_event, params) {
   const acc = await loadNanoAccountFromDB(params.fromAddress);
   if (!acc) {
     return response(400, {
@@ -173,11 +180,11 @@ async function send(event, params) {
 /**
  * Receives all pending transactions for a given nano account.
  *
- * @param {APIGatewayProxyEvent} event the API Gateway event data
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
  * @param {Object} params the http request body data
  * @returns the address, updated account balance, and resolved count for the given nano account.
  */
-async function receive(event, params) {
+async function receive(_event, params) {
   const acc = await loadNanoAccountFromDB(params.receiveAddress);
   if (!acc) {
     return response(400, { error: 'invalid wallet address' });
@@ -194,7 +201,7 @@ async function receive(event, params) {
 /**
  * Sends a percentage of nano from the TryNano Faucet to the provided nano account.
  *
- * @param {APIGatewayProxyEvent} event the API Gateway event data
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
  * @param {Object} params the http request body data
  * @returns the faucet address and the updated faucet balance
  */
@@ -213,6 +220,25 @@ async function getFromFaucet(event, params) {
     });
   }
 
+  console.log(event);
+  console.log(`user ip: ${event.requestContext.http.sourceIp}`);
+  // Reject the user's faucet request if not eligible
+  const faucetEligibilityStatus = await checkFaucetEligibility(
+    event.requestContext.http.sourceIp
+  );
+  console.log(
+    `after checked faucet eligibility, res: ${JSON.stringify(
+      faucetEligibilityStatus
+    )}`
+  );
+  if (!faucetEligibilityStatus.isEligible) {
+    console.log('not eligible for faucet');
+    return response(400, {
+      error: faucetEligibilityStatus.reason,
+    });
+  }
+
+  // Get Faucet account info to check things like the current balance
   const accountInfo = await c.updateWalletAccount({
     address: FAUCET_ADDRESS,
     publicKey: PUBLIC_KEY,
@@ -221,6 +247,11 @@ async function getFromFaucet(event, params) {
 
   if (!accountInfo) {
     return response(500, { error: `unable to retrieve faucet account info` });
+  }
+
+  // Make sure there's sufficient funds in the faucet
+  if (accountInfo.balance.asNumber === 0) {
+    return response(400, { error: `Faucet balance is zero` });
   }
 
   const res = await c.send(
@@ -247,11 +278,11 @@ async function getFromFaucet(event, params) {
 /**
  * Receives any pending transactions for the TryNano faucet
  *
- * @param {APIGatewayProxyEvent} event the API Gateway event data
- * @param {Object} params the http request body data
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
+ * @param {Object} _params the http request body data
  * @returns the faucet address, the updated balance, and the number of resolved pending transactions
  */
-async function receivePendingFaucetTransactions(event, params) {
+async function receivePendingFaucetTransactions(_event, _params) {
   const res = await c.receive({
     address: FAUCET_ADDRESS,
     publicKey: PUBLIC_KEY,
@@ -292,7 +323,7 @@ function response(code, body) {
 async function loadNanoAccountFromDB(address) {
   const res = await ddb
     .getItem({
-      TableName: DDB_TABLE_NAME,
+      TableName: DDB_WALLET_TABLE_NAME,
       Key: {
         walletID: {
           S: address,
@@ -311,6 +342,100 @@ async function loadNanoAccountFromDB(address) {
     privateKey: wallet.privateKey,
   };
   return nanoAccount;
+}
+
+/**
+ * Check the user's eligibility to use the faucet.
+ *
+ * @param {string} ipAddress the user's IP address
+ * @returns {boolean} is the user eligible to use the faucet or not
+ */
+async function checkFaucetEligibility(ipAddress) {
+  const ts = Date.now();
+  const expirationTime =
+    Math.round(ts / 1000) + FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS;
+  const res = await ddb
+    .getItem({
+      TableName: DDB_FAUCET_IP_HISTORY_TABLE_NAME,
+      Key: {
+        ipAddress: {
+          S: ipAddress,
+        },
+      },
+    })
+    .promise();
+  if (!res.Item) {
+    console.log(`before put new item`);
+    await ddb
+      .putItem({
+        TableName: DDB_FAUCET_IP_HISTORY_TABLE_NAME,
+        Item: AWS.DynamoDB.Converter.marshall({
+          ipAddress: ipAddress,
+          numFaucetInvocations: '1',
+          lastUsedTs: ts.toString(),
+          expirationTime: expirationTime.toString(),
+        }),
+      })
+      .promise();
+    console.log(`after put new item`);
+    return {
+      isEligible: true,
+    };
+  }
+  const ipHistoryData = AWS.DynamoDB.Converter.unmarshall(res.Item);
+  const currNumInvokes = parseInt(ipHistoryData.numFaucetInvocations) + 1;
+  const numSecondsSinceLastInvoke =
+    (ts - parseInt(ipHistoryData.lastUsedTs)) / 1000;
+  const numHoursSinceLastInvoke = numSecondsSinceLastInvoke / 3600;
+
+  /*
+    If this IP Address has:
+        (a) Invoked the faucet in the past 10 minutes, or
+        (b) Invoked the faucet more than 10 times in the past 24 hours
+    then reject the request.
+  */
+  if (numSecondsSinceLastInvoke < FAUCET_THROTTLE_DURATION_SECONDS) {
+    return {
+      isEligible: false,
+      reason:
+        'Faucet was used within the past 10 minutes, please try again later.',
+    };
+  }
+
+  if (
+    currNumInvokes > FAUCET_INVOKE_LIMIT &&
+    numHoursSinceLastInvoke < FAUCET_RESET_TIME_HOURS
+  ) {
+    return {
+      isEligible: false,
+      reason:
+        'You have reached the max number of faucet uses, please try again after 24 hours.',
+    };
+  }
+  await ddb
+    .updateItem({
+      TableName: DDB_FAUCET_IP_HISTORY_TABLE_NAME,
+      Key: {
+        ipAddress: {
+          S: ipAddress,
+        },
+      },
+      UpdateExpression:
+        'SET numFaucetInvocations = :n, lastUsedTs = :l, expirationTime = :e',
+      ExpressionAttributeValues: {
+        ':n': {
+          N: numHoursSinceLastInvoke < 24 ? currNumInvokes.toString() : '1',
+        },
+        ':l': { N: ts.toString() },
+        ':e': { N: expirationTime.toString() },
+      },
+      ReturnValues: 'UPDATED_NEW',
+    })
+    .promise();
+
+  return {
+    isEligible: true,
+  };
 }
 
 /**
