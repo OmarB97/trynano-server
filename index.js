@@ -44,28 +44,32 @@ const apiMapping = {
  * @returns {HttpResponse} Http response object
  */
 exports.handler = async function (event) {
-  if (event.requestContext.http.method === 'OPTIONS') {
-    return response(200, {});
-  }
+  try {
+    if (event.requestContext.http.method === 'OPTIONS') {
+      return response(200, {});
+    }
 
-  const error = validateState();
-  if (error) {
-    return response(500, { error: error });
-  }
+    const error = validateState();
+    if (error) {
+      return response(500, { error: error });
+    }
 
-  const token = event.headers['x-recaptcha'];
-  const captchaResponse = token ? await validateCaptcha(token) : undefined;
-  if (!(captchaResponse && captchaResponse.success)) {
-    return response(403, { error: 'access denied: invalid recaptcha token' });
-  }
+    const token = event.headers['x-recaptcha'];
+    const captchaResponse = token ? await validateCaptcha(token) : undefined;
+    if (!(captchaResponse && captchaResponse.success)) {
+      return response(403, { error: 'access denied: invalid recaptcha token' });
+    }
 
-  const path = event.rawPath;
-  const params = event.body ? JSON.parse(event.body) : {};
-  const apiMethod = apiMapping[path];
-  if (!apiMethod) {
-    return response(404, 'not found');
+    const path = event.rawPath;
+    const params = event.body ? JSON.parse(event.body) : {};
+    const apiMethod = apiMapping[path];
+    if (!apiMethod) {
+      return response(404, 'not found');
+    }
+    return await apiMethod(event, params);
+  } catch (err) {
+    return response(500, { error: 'Server error, please try again later!' });
   }
-  return await apiMethod(event, params);
 };
 
 /**
