@@ -16,11 +16,16 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
 
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
-const FAUCET_PERCENT = 0.00015;
+
+const WALLET_EXPIRATION_TIME_MS = 300000; // 5 minutes in miliseconds
+// const WALLET_EXPIRATION_TIME_MS = 604800000; // 7 days in miliseconds
+
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
 const FAUCET_THROTTLE_DURATION_SECONDS = 600;
 const FAUCET_INVOKE_LIMIT = 10;
 const FAUCET_RESET_TIME_HOURS = 24;
+
+const FAUCET_PERCENT = 0.00015;
 
 const c = new nano_client.NanoClient({
   url: 'https://api.nanobox.cc',
@@ -94,9 +99,9 @@ async function createWallets(_event, _params) {
         TableName: DDB_WALLET_TABLE_NAME,
         Item: AWS.DynamoDB.Converter.marshall({
           walletID: wallet.address,
+          expirationTs: Date.now() + WALLET_EXPIRATION_TIME_MS,
           privateKey: wallet.privateKey,
           publicKey: wallet.publicKey,
-          ts: Date.now(),
         }),
       })
       .promise();
