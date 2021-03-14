@@ -1,6 +1,5 @@
 const AWS = require('aws-sdk');
 const nano_client = require('@nanobox/nano-client');
-const { resolveModuleName } = require('typescript');
 
 require('dotenv').config();
 
@@ -212,7 +211,7 @@ function response(code, body) {
 
 /**
  * An async/await friendly foreach function.
- * 
+ *
  * @param {*} array list to loop over
  * @param {*} callback code to run on each list item
  */
