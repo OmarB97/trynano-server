@@ -53,7 +53,7 @@ const apiMapping = {
 };
 
 /**
- * Entry-point for the AWS Lambda function. Checks recaptcha token and reroutes to appropriate api method based off the requested path.
+ * Entry-point for the NanoFaucet AWS Lambda function. Checks recaptcha token and reroutes to appropriate api method based off the requested path.
  *
  * @param {APIGatewayProxyEvent} event the API Gateway event data
  * @returns {HttpResponse} Http response object

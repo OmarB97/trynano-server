@@ -24,6 +24,12 @@ const ddb = new AWS.DynamoDB({
   region: 'us-west-1',
 });
 
+/**
+ * Entry-point for the ReturnAllNanoToFaucet AWS Lambda function.
+ *
+ * @param {APIGatewayProxyEvent} event CloudWatch Event object
+ * @returns {HttpResponse} Http response object
+ */
 exports.handler = async (event) => {
   try {
     console.log(`event: ${JSON.stringify(event)}`);
@@ -204,6 +210,12 @@ function response(code, body) {
   };
 }
 
+/**
+ * An async/await friendly foreach function.
+ * 
+ * @param {*} array list to loop over
+ * @param {*} callback code to run on each list item
+ */
 async function asyncForEach(array, callback) {
   for (let index = 0; index < array.length; index++) {
     await callback(array[index], index, array);
