@@ -1,9 +1,5 @@
 const AWS = require('aws-sdk');
 const nano_client = require('@nanobox/nano-client');
-<<<<<<< Updated upstream
-=======
-const { NANO } = require('@nanobox/nano-client/dist/models');
->>>>>>> Stashed changes
 
 require('dotenv').config();
 
@@ -90,9 +86,8 @@ async function getAllEligibleAccounts() {
       TableName: DDB_WALLET_TABLE_NAME,
       ProjectionExpression:
         'walletID, publicKey, privateKey, balance, expirationTs',
-      FilterExpression: 'expirationTs < :ts_now AND balance > :z',
+      FilterExpression: 'balance > :z',
       ExpressionAttributeValues: {
-        ':ts_now': { N: Date.now().toString() },
         ':z': { N: '0' },
       },
     })
@@ -104,34 +99,23 @@ async function getAllEligibleAccounts() {
     return null;
   }
 
-  const sendResults = [];
   res.Items.forEach(async (item) => {
     // wallets.push(AWS.DynamoDB.Converter.unmarshall(item));
-    const walletDBData = AWS.DynamoDB.Converter.unmarshall(item);
-
-    const accountInfo = await c.updateWalletAccount({
-      address: walletDBData.walletID,
-      publicKey: walletDBData.publicKey,
-      privateKey: walletDBData.privateKey,
-    });
-
-    if (!accountInfo) {
-      return response(500, { error: `unable to retrieve faucet account info` });
-    }
-
-    console.log(`accountInfo: ${JSON.stringify(accountInfo)}`);
+    const wallet = AWS.DynamoDB.Converter.unmarshall(item);
+    const nanoAccount = {
+      address: wallet.walletID,
+      publicKey: wallet.publicKey,
+      privateKey: wallet.privateKey,
+    };
 
     // now send all the nano in this wallet to the faucet
-    sendResults.push(
-      await c.send(accountInfo, FAUCET_ADDRESS, accountInfo.balance)
-    );
+    const sendRes = await c.sendMax(nanoAccount, FAUCET_ADDRESS);
+    const updatedBalance = sendRes.balance.asString;
+
   });
 
   //   const updatedBalance = sendRes.balance.asString;
   // console.log(`updatedBalance: ${updatedBalance}`);
-
-  await Promise.all(sendResults);
-  console.log(`sendResults: ${JSON.stringify(sendResults)}`);
 
   //   console.log(`wallets: ${JSON.stringify(wallets)}`);
   return true;
@@ -143,6 +127,26 @@ async function getAllEligibleAccounts() {
   //     privateKey: wallet.privateKey,
   //   };
   //   return nanoAccount;
+}
+
+/**
+ * Receives any pending transactions for the TryNano faucet
+ *
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
+ * @param {Object} _params the http request body data
+ * @returns the faucet address, the updated balance, and the number of resolved pending transactions
+ */
+async function receivePendingFaucetTransactions(_event, _params) {
+  const res = await c.receive({
+    address: FAUCET_ADDRESS,
+    publicKey: PUBLIC_KEY,
+    privateKey: PRIVATE_KEY,
+  });
+  return response(200, {
+    address: FAUCET_ADDRESS,
+    balance: res.account.balance.asString,
+    resolvedCount: res.resolvedCount,
+  });
 }
 
 /**
