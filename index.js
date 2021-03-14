@@ -17,8 +17,7 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
 
-const WALLET_EXPIRATION_TIME_MS = 60000; // 1 minute in miliseconds
-// const WALLET_EXPIRATION_TIME_MS = 604800000; // 7 days in miliseconds
+const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
 
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
 const FAUCET_THROTTLE_DURATION_SECONDS = 600;
@@ -99,7 +98,8 @@ async function createWallets(_event, _params) {
         TableName: DDB_WALLET_TABLE_NAME,
         Item: AWS.DynamoDB.Converter.marshall({
           walletID: wallet.address,
-          expirationTs: Date.now() + WALLET_EXPIRATION_TIME_MS,
+          expirationTs:
+            Math.round(Date.now() / 1000) + WALLET_EXPIRATION_TIME_SECONDS,
           privateKey: wallet.privateKey,
           publicKey: wallet.publicKey,
           balance: 0,
@@ -179,10 +179,7 @@ async function send(_event, params) {
 
   // update balance in DynamoDB
   const updatedBalance = res.balance.asString;
-  await updateNanoBalanceInDB(
-    params.fromAddress,
-    updatedBalance
-  );
+  await updateNanoBalanceInDB(params.fromAddress, updatedBalance);
 
   return response(200, {
     address: params.fromAddress,
@@ -208,10 +205,7 @@ async function receive(_event, params) {
 
   // update balance in DynamoDB after receive
   const updatedBalance = res.account.balance.asString;
-  await updateNanoBalanceInDB(
-    params.receiveAddress,
-    updatedBalance
-  );
+  await updateNanoBalanceInDB(params.receiveAddress, updatedBalance);
 
   return response(200, {
     address: params.receiveAddress,
@@ -246,6 +240,7 @@ async function getFromFaucet(event, params) {
   const faucetEligibilityStatus = await checkFaucetEligibility(
     event.requestContext.http.sourceIp
   );
+
   if (!faucetEligibilityStatus.isEligible) {
     return response(400, {
       error: faucetEligibilityStatus.reason,
