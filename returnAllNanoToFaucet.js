@@ -91,7 +91,7 @@ async function returnAllNanoToFaucet() {
       TableName: DDB_WALLET_TABLE_NAME,
       ProjectionExpression:
         'walletID, publicKey, privateKey, balance, returnToFaucetEpoch',
-      FilterExpression: 'returnToFaucetEpoch > :t AND balance > :z',
+      FilterExpression: 'returnToFaucetEpoch < :t AND balance > :z',
       ExpressionAttributeValues: {
         ':t': { N: Date.now().toString() },
         ':z': { N: '0' },
