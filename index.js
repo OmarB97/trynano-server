@@ -18,6 +18,15 @@ const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
 const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
 
+/*
+    Must wait 1 hour after last wallet usage until eligible to return to
+    faucet.
+
+    Ensures that funds are not returned to faucet while user is still
+    using the wallet.
+*/
+const RETURN_TO_FAUCET_EPOCH_MS = 3600000;
+
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
 const FAUCET_THROTTLE_DURATION_SECONDS = 600;
 const FAUCET_INVOKE_LIMIT = 10;
@@ -101,6 +110,7 @@ async function createWallets(_event, _params) {
           privateKey: wallet.privateKey,
           publicKey: wallet.publicKey,
           balance: 0,
+          returnToFaucetEpoch: Date.now() + RETURN_TO_FAUCET_EPOCH_MS,
         }),
       })
       .promise();
@@ -333,6 +343,7 @@ async function loadNanoAccountFromDB(address) {
 
 /**
  * Updates the balance for a TryNano wallet in DynamoDB.
+ * Also update the returnToFaucetEpoch field since we've used the wallet.
  *
  * @param {string} address the address of the nano account
  * @param {string} updatedBalance the updated wallet balance
@@ -346,10 +357,13 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
           S: address,
         },
       },
-      UpdateExpression: 'SET balance = :u',
+      UpdateExpression: 'SET balance = :u, returnToFaucetEpoch = :r',
       ExpressionAttributeValues: {
         ':u': {
           N: updatedBalance,
+        },
+        ':r': {
+          N: (Date.now() + RETURN_TO_FAUCET_EPOCH_MS).toString(),
         },
       },
       ReturnValues: 'UPDATED_NEW',

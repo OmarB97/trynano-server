@@ -1,5 +1,6 @@
 const AWS = require('aws-sdk');
 const nano_client = require('@nanobox/nano-client');
+const { resolveModuleName } = require('typescript');
 
 require('dotenv').config();
 
@@ -61,12 +62,17 @@ exports.handler = async (event) => {
       });
     }
 
-    return response(200, {
+    const res = response(200, {
       walletCount: returnToFaucetRes.walletCount,
       previousFaucetBalance: previousFaucetBalance,
       updatedFaucetBalance: receiveRes.updatedFaucetBalance,
       resolvedCount: receiveRes.resolvedCount,
     });
+
+    // Show the final response in the logs
+    console.log(`response: ${JSON.stringify(res)}`);
+
+    return res;
   } catch (err) {
     console.log(`caught error: ${err.message}`);
     return response(500, { error: err.message });
@@ -74,7 +80,8 @@ exports.handler = async (event) => {
 };
 
 /**
- * Get all non-zero balance nano accounts and sends all their nano to the TryNano faucet.
+ * Gets all non-zero balance nano accounts that haven't been used for at least 1 hour,
+ * and sends all their nano to the TryNano faucet.
  *
  * @returns Wallet count if successful, error if not successful
  */
@@ -82,15 +89,17 @@ async function returnAllNanoToFaucet() {
   const res = await ddb
     .scan({
       TableName: DDB_WALLET_TABLE_NAME,
-      ProjectionExpression: 'walletID, publicKey, privateKey, balance',
-      FilterExpression: 'balance > :z',
+      ProjectionExpression:
+        'walletID, publicKey, privateKey, balance, returnToFaucetEpoch',
+      FilterExpression: 'returnToFaucetEpoch > :t AND balance > :z',
       ExpressionAttributeValues: {
+        ':t': { N: Date.now().toString() },
         ':z': { N: '0' },
       },
     })
     .promise();
 
-  console.log(`res: ${JSON.stringify(res)}`);
+  console.log(`ddb scan result: ${JSON.stringify(res)}`);
 
   if (!res.Items) {
     return {
@@ -99,7 +108,7 @@ async function returnAllNanoToFaucet() {
   }
 
   const sendNanoFromWallets = async () => {
-    console.log('Start');
+    console.log('Start sending nano');
     await asyncForEach(res.Items, async (item) => {
       const wallet = AWS.DynamoDB.Converter.unmarshall(item);
       const nanoAccount = {
@@ -120,7 +129,7 @@ async function returnAllNanoToFaucet() {
       // finally, update the wallet balance in the database
       await updateNanoBalanceInDB(nanoAccount.address, updatedBalance);
     });
-    console.log('Done');
+    console.log('Done sending nano');
   };
 
   // run async/await on a loop to wait for all wallets to send their nano
