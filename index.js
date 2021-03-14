@@ -16,7 +16,6 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
 
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
-
 const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
 
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
