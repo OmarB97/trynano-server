@@ -16,7 +16,6 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
 
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
-const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
 
 /*
     Must wait 1 hour after last wallet usage until eligible to return to
@@ -26,12 +25,12 @@ const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
     using the wallet.
 */
 const RETURN_TO_FAUCET_EPOCH_MS = 3600000;
+const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
 
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
-const FAUCET_THROTTLE_DURATION_SECONDS = 600;
+const FAUCET_THROTTLE_DURATION_SECONDS = 600; // 10 minutes
 const FAUCET_INVOKE_LIMIT = 10;
 const FAUCET_RESET_TIME_HOURS = 24;
-
 const FAUCET_PERCENT = 0.00015;
 
 const c = new nano_client.NanoClient({
