@@ -43,7 +43,6 @@ const apiMapping = {
   '/api/send': send,
   '/api/receive': receive,
   '/api/getFromFaucet': getFromFaucet,
-  '/api/receivePendingFaucetTransactions': receivePendingFaucetTransactions,
 };
 
 /**
@@ -281,26 +280,6 @@ async function getFromFaucet(event, params) {
   return response(200, {
     address: FAUCET_ADDRESS,
     balance: res.balance.asString,
-  });
-}
-
-/**
- * Receives any pending transactions for the TryNano faucet
- *
- * @param {APIGatewayProxyEvent} _event the API Gateway event data
- * @param {Object} _params the http request body data
- * @returns the faucet address, the updated balance, and the number of resolved pending transactions
- */
-async function receivePendingFaucetTransactions(_event, _params) {
-  const res = await c.receive({
-    address: FAUCET_ADDRESS,
-    publicKey: PUBLIC_KEY,
-    privateKey: PRIVATE_KEY,
-  });
-  return response(200, {
-    address: FAUCET_ADDRESS,
-    balance: res.account.balance.asString,
-    resolvedCount: res.resolvedCount,
   });
 }
 
