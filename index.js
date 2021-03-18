@@ -17,13 +17,20 @@ const PUBLIC_KEY = process.env.PUBLIC_KEY,
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
 
+/*
+    Must wait 1 hour after last wallet usage until eligible to return to
+    faucet.
+
+    Ensures that funds are not returned to faucet while user is still
+    using the wallet.
+*/
+const RETURN_TO_FAUCET_EPOCH_MS = 3600000;
 const WALLET_EXPIRATION_TIME_SECONDS = 259200; // 72 hours
 
 const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
-const FAUCET_THROTTLE_DURATION_SECONDS = 600;
+const FAUCET_THROTTLE_DURATION_SECONDS = 600; // 10 minutes
 const FAUCET_INVOKE_LIMIT = 10;
 const FAUCET_RESET_TIME_HOURS = 24;
-
 const FAUCET_PERCENT = 0.00015;
 
 const c = new nano_client.NanoClient({
@@ -43,11 +50,10 @@ const apiMapping = {
   '/api/send': send,
   '/api/receive': receive,
   '/api/getFromFaucet': getFromFaucet,
-  '/api/receivePendingFaucetTransactions': receivePendingFaucetTransactions,
 };
 
 /**
- * Entry-point for the AWS Lambda function. Checks recaptcha token and reroutes to appropriate api method based off the requested path.
+ * Entry-point for the NanoFaucet AWS Lambda function. Checks recaptcha token and reroutes to appropriate api method based off the requested path.
  *
  * @param {APIGatewayProxyEvent} event the API Gateway event data
  * @returns {HttpResponse} Http response object
@@ -103,6 +109,7 @@ async function createWallets(_event, _params) {
           privateKey: wallet.privateKey,
           publicKey: wallet.publicKey,
           balance: 0,
+          returnToFaucetEpoch: Date.now() + RETURN_TO_FAUCET_EPOCH_MS,
         }),
       })
       .promise();
@@ -285,26 +292,6 @@ async function getFromFaucet(event, params) {
 }
 
 /**
- * Receives any pending transactions for the TryNano faucet
- *
- * @param {APIGatewayProxyEvent} _event the API Gateway event data
- * @param {Object} _params the http request body data
- * @returns the faucet address, the updated balance, and the number of resolved pending transactions
- */
-async function receivePendingFaucetTransactions(_event, _params) {
-  const res = await c.receive({
-    address: FAUCET_ADDRESS,
-    publicKey: PUBLIC_KEY,
-    privateKey: PRIVATE_KEY,
-  });
-  return response(200, {
-    address: FAUCET_ADDRESS,
-    balance: res.account.balance.asString,
-    resolvedCount: res.resolvedCount,
-  });
-}
-
-/**
  * Constructs an HttpResponse object with the appropriate CORS headers.
  *
  * @param {HttpStatus} code HTTP response status code
@@ -355,6 +342,7 @@ async function loadNanoAccountFromDB(address) {
 
 /**
  * Updates the balance for a TryNano wallet in DynamoDB.
+ * Also update the returnToFaucetEpoch field since we've used the wallet.
  *
  * @param {string} address the address of the nano account
  * @param {string} updatedBalance the updated wallet balance
@@ -368,10 +356,13 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
           S: address,
         },
       },
-      UpdateExpression: 'SET balance = :u',
+      UpdateExpression: 'SET balance = :u, returnToFaucetEpoch = :r',
       ExpressionAttributeValues: {
         ':u': {
           N: updatedBalance,
+        },
+        ':r': {
+          N: (Date.now() + RETURN_TO_FAUCET_EPOCH_MS).toString(),
         },
       },
       ReturnValues: 'UPDATED_NEW',
@@ -387,7 +378,7 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
  */
 async function checkFaucetEligibility(ipAddress) {
   const ts = Date.now();
-  const expirationTime =
+  const expirationTs =
     Math.round(ts / 1000) + FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS;
   const res = await ddb
     .getItem({
@@ -405,9 +396,9 @@ async function checkFaucetEligibility(ipAddress) {
         TableName: DDB_FAUCET_IP_HISTORY_TABLE_NAME,
         Item: AWS.DynamoDB.Converter.marshall({
           ipAddress: ipAddress,
-          numFaucetInvocations: '1',
-          lastUsedTs: ts.toString(),
-          expirationTime: expirationTime.toString(),
+          numFaucetInvocations: 1,
+          lastUsedTs: ts,
+          expirationTs: expirationTs,
         }),
       })
       .promise();
@@ -416,9 +407,9 @@ async function checkFaucetEligibility(ipAddress) {
     };
   }
   const ipHistoryData = AWS.DynamoDB.Converter.unmarshall(res.Item);
-  const currNumInvokes = parseInt(ipHistoryData.numFaucetInvocations) + 1;
+  const currNumInvokes = ipHistoryData.numFaucetInvocations + 1;
   const numSecondsSinceLastInvoke =
-    (ts - parseInt(ipHistoryData.lastUsedTs)) / 1000;
+    (ts - ipHistoryData.lastUsedTs) / 1000;
   const numHoursSinceLastInvoke = numSecondsSinceLastInvoke / 3600;
 
   /*
@@ -454,13 +445,13 @@ async function checkFaucetEligibility(ipAddress) {
         },
       },
       UpdateExpression:
-        'SET numFaucetInvocations = :n, lastUsedTs = :l, expirationTime = :e',
+        'SET numFaucetInvocations = :n, lastUsedTs = :l, expirationTs = :e',
       ExpressionAttributeValues: {
         ':n': {
           N: numHoursSinceLastInvoke < 24 ? currNumInvokes.toString() : '1',
         },
         ':l': { N: ts.toString() },
-        ':e': { N: expirationTime.toString() },
+        ':e': { N: expirationTs.toString() },
       },
       ReturnValues: 'UPDATED_NEW',
     })
