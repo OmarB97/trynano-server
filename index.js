@@ -396,9 +396,9 @@ async function checkFaucetEligibility(ipAddress) {
         TableName: DDB_FAUCET_IP_HISTORY_TABLE_NAME,
         Item: AWS.DynamoDB.Converter.marshall({
           ipAddress: ipAddress,
-          numFaucetInvocations: '1',
-          lastUsedTs: ts.toString(),
-          expirationTime: expirationTime.toString(),
+          numFaucetInvocations: 1,
+          lastUsedTs: ts,
+          expirationTime: expirationTime,
         }),
       })
       .promise();
@@ -407,9 +407,9 @@ async function checkFaucetEligibility(ipAddress) {
     };
   }
   const ipHistoryData = AWS.DynamoDB.Converter.unmarshall(res.Item);
-  const currNumInvokes = parseInt(ipHistoryData.numFaucetInvocations) + 1;
+  const currNumInvokes = ipHistoryData.numFaucetInvocations + 1;
   const numSecondsSinceLastInvoke =
-    (ts - parseInt(ipHistoryData.lastUsedTs)) / 1000;
+    (ts - ipHistoryData.lastUsedTs) / 1000;
   const numHoursSinceLastInvoke = numSecondsSinceLastInvoke / 3600;
 
   /*
