@@ -378,7 +378,7 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
  */
 async function checkFaucetEligibility(ipAddress) {
   const ts = Date.now();
-  const expirationTime =
+  const expirationTs =
     Math.round(ts / 1000) + FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS;
   const res = await ddb
     .getItem({
@@ -398,7 +398,7 @@ async function checkFaucetEligibility(ipAddress) {
           ipAddress: ipAddress,
           numFaucetInvocations: 1,
           lastUsedTs: ts,
-          expirationTime: expirationTime,
+          expirationTs: expirationTs,
         }),
       })
       .promise();
@@ -445,13 +445,13 @@ async function checkFaucetEligibility(ipAddress) {
         },
       },
       UpdateExpression:
-        'SET numFaucetInvocations = :n, lastUsedTs = :l, expirationTime = :e',
+        'SET numFaucetInvocations = :n, lastUsedTs = :l, expirationTs = :e',
       ExpressionAttributeValues: {
         ':n': {
           N: numHoursSinceLastInvoke < 24 ? currNumInvokes.toString() : '1',
         },
         ':l': { N: ts.toString() },
-        ':e': { N: expirationTime.toString() },
+        ':e': { N: expirationTs.toString() },
       },
       ReturnValues: 'UPDATED_NEW',
     })
