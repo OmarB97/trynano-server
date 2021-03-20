@@ -3,9 +3,9 @@ const nano_client = require('@nanobox/nano-client');
 
 require('dotenv').config();
 
-const PUBLIC_KEY = process.env.PUBLIC_KEY,
-  PRIVATE_KEY = process.env.PRIVATE_KEY,
-  FAUCET_ADDRESS = process.env.ADDRESS,
+const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
+  FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY,
+  FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
   NANOBOX_USER = process.env.NANOBOX_USER,
   NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
 
@@ -41,8 +41,8 @@ exports.handler = async (event) => {
     // Get Faucet account info to check things like the current balance
     const accountInfo = await c.updateWalletAccount({
       address: FAUCET_ADDRESS,
-      publicKey: PUBLIC_KEY,
-      privateKey: PRIVATE_KEY,
+      publicKey: FAUCET_PUBLIC_KEY,
+      privateKey: FAUCET_PRIVATE_KEY,
     });
 
     if (!accountInfo) {
@@ -179,8 +179,8 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
 async function receivePendingFaucetTransactions() {
   const res = await c.receive({
     address: FAUCET_ADDRESS,
-    publicKey: PUBLIC_KEY,
-    privateKey: PRIVATE_KEY,
+    publicKey: FAUCET_PUBLIC_KEY,
+    privateKey: FAUCET_PRIVATE_KEY,
   });
 
   if (res.error) {
@@ -228,11 +228,11 @@ async function asyncForEach(array, callback) {
  */
 function validateState() {
   if (!FAUCET_ADDRESS) {
-    return 'ADDRESS key missing from .env - you must fix';
-  } else if (!PUBLIC_KEY) {
-    return 'PUBLIC_KEY key missing from .env - you must fix';
-  } else if (!PRIVATE_KEY) {
-    return 'PRIVATE_KEY key missing from .env - you must fix';
+    return 'FAUCET_ADDRESS key missing from .env - you must fix';
+  } else if (!FAUCET_PUBLIC_KEY) {
+    return 'FAUCET_PUBLIC_KEY key missing from .env - you must fix';
+  } else if (!FAUCET_PRIVATE_KEY) {
+    return 'FAUCET_PRIVATE_KEY key missing from .env - you must fix';
   } else if (!NANOBOX_USER) {
     return 'NANOBOX_USER key missing from .env - you must fix';
   } else if (!NANOBOX_PASSWORD) {
