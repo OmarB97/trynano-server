@@ -211,7 +211,7 @@ async function receive(_event, params) {
     return response(400, { error: 'invalid wallet address' });
   }
 
-  const res = await c.receive(acc);
+  const res = await c.update(acc);
 
   // update balance in DynamoDB after receive
   const updatedBalance = res.account.balance.asString;

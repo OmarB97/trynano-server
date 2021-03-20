@@ -177,7 +177,7 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
  * @returns The updated faucet balance, and the number of resolved pending transactions
  */
 async function receivePendingFaucetTransactions() {
-  const res = await c.receive({
+  const res = await c.update({
     address: FAUCET_ADDRESS,
     publicKey: FAUCET_PUBLIC_KEY,
     privateKey: FAUCET_PRIVATE_KEY,
