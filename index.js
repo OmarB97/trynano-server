@@ -288,7 +288,7 @@ async function getFromFaucet(event, params) {
 
   return response(200, {
     address: FAUCET_ADDRESS,
-    balance: res.balance.asString,
+    balance: res.balance.asNumber,
   });
 }
 
@@ -313,7 +313,7 @@ async function getFaucetInfo(_event, _params) {
   }
 
   return response(200, {
-    balance: accountInfo.balance.asString,
+    balance: accountInfo.balance.asNumber,
     payout: FAUCET_PERCENT
   });
 }
