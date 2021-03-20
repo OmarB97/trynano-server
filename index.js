@@ -7,9 +7,10 @@ const { HttpResponse } = require('aws-sdk');
 
 require('dotenv').config();
 
-const PUBLIC_KEY = process.env.PUBLIC_KEY,
-  PRIVATE_KEY = process.env.PRIVATE_KEY,
-  FAUCET_ADDRESS = process.env.ADDRESS,
+const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
+  FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY,
+  FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
+  DEFAULT_REP = process.env.DEFAULT_REP,
   CAPTCHA_SECRET = process.env.CAPTCHA_SECRET,
   NANOBOX_USER = process.env.NANOBOX_USER,
   NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
@@ -39,6 +40,7 @@ const c = new nano_client.NanoClient({
     username: NANOBOX_USER,
     password: NANOBOX_PASSWORD,
   },
+  defaultRepresentative: DEFAULT_REP,
 });
 
 const ddb = new AWS.DynamoDB({
@@ -258,8 +260,8 @@ async function getFromFaucet(event, params) {
   // Get Faucet account info to check things like the current balance
   const accountInfo = await c.updateWalletAccount({
     address: FAUCET_ADDRESS,
-    publicKey: PUBLIC_KEY,
-    privateKey: PRIVATE_KEY,
+    publicKey: FAUCET_PUBLIC_KEY,
+    privateKey: FAUCET_PRIVATE_KEY,
   });
 
   if (!accountInfo) {
@@ -274,8 +276,8 @@ async function getFromFaucet(event, params) {
   const res = await c.send(
     {
       address: FAUCET_ADDRESS,
-      publicKey: PUBLIC_KEY,
-      privateKey: PRIVATE_KEY,
+      publicKey: FAUCET_PUBLIC_KEY,
+      privateKey: FAUCET_PRIVATE_KEY,
     },
     params.toAddress,
     NANO.fromNumber(accountInfo.balance.asNumber * FAUCET_PERCENT)
@@ -304,8 +306,8 @@ async function getFaucetInfo(_event, _params) {
   // Get Faucet account info to check things like the current balance
   const accountInfo = await c.updateWalletAccount({
     address: FAUCET_ADDRESS,
-    publicKey: PUBLIC_KEY,
-    privateKey: PRIVATE_KEY,
+    publicKey: FAUCET_PUBLIC_KEY,
+    privateKey: FAUCET_PRIVATE_KEY,
   });
 
   if (!accountInfo) {
@@ -520,10 +522,10 @@ async function validateCaptcha(token) {
 function validateState() {
   if (!FAUCET_ADDRESS) {
     return 'ADDRESS key missing from .env - you must fix';
-  } else if (!PUBLIC_KEY) {
-    return 'PUBLIC_KEY key missing from .env - you must fix';
-  } else if (!PRIVATE_KEY) {
-    return 'PRIVATE_KEY key missing from .env - you must fix';
+  } else if (!FAUCET_PUBLIC_KEY) {
+    return 'FAUCET_PUBLIC_KEY key missing from .env - you must fix';
+  } else if (!FAUCET_PRIVATE_KEY) {
+    return 'FAUCET_PRIVATE_KEY key missing from .env - you must fix';
   } else if (!CAPTCHA_SECRET) {
     return 'CAPTCHA_SECRET key missing from .env - you must fix';
   } else if (!NANOBOX_USER) {
