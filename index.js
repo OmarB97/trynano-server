@@ -50,6 +50,7 @@ const apiMapping = {
   '/api/send': send,
   '/api/receive': receive,
   '/api/getFromFaucet': getFromFaucet,
+  '/api/getFaucetInfo': getFaucetInfo,
 };
 
 /**
@@ -288,6 +289,32 @@ async function getFromFaucet(event, params) {
   return response(200, {
     address: FAUCET_ADDRESS,
     balance: res.balance.asString,
+  });
+}
+
+/**
+ * Gets the current faucet balance + payout percentage.
+ *
+ * @param {APIGatewayProxyEvent} _event the API Gateway event data
+ * @param {Object} _params the http request body data
+ * @returns current faucet balance and payout percentage (decimal)
+ */
+async function getFaucetInfo(_event, _params) {
+
+  // Get Faucet account info to check things like the current balance
+  const accountInfo = await c.updateWalletAccount({
+    address: FAUCET_ADDRESS,
+    publicKey: PUBLIC_KEY,
+    privateKey: PRIVATE_KEY,
+  });
+
+  if (!accountInfo) {
+    return response(500, { error: `unable to retrieve faucet account info` });
+  }
+
+  return response(200, {
+    balance: accountInfo.balance.asString,
+    payout: FAUCET_PERCENT
   });
 }
 
