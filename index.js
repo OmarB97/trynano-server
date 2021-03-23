@@ -273,25 +273,17 @@ async function getFromFaucet(event, params) {
     return response(400, { error: `Faucet balance is zero` });
   }
 
-  console.log(`toAddress: ${acc.address}`);
-  console.log(`faucetSendAmount: ${JSON.stringify(NANO.fromNumber(faucetAccountInfo.balance.asNumber * FAUCET_PERCENT))}`)
-
-  console.log(`rep before: ${JSON.stringify(faucetAccountInfo.representative)}`);
-  faucetAccountInfo.representative = 'nano_1kaiak5dbaaqpenb7nshqgq9tehgb5wy9y9ju9ehunexzmkzmzphk8yw8r7u';
-  await c.setRepresentative(faucetAccountInfo);
-
   const res = await c.send(
     faucetAccountInfo,
     acc.address,
     NANO.fromNumber(faucetAccountInfo.balance.asNumber * FAUCET_PERCENT)
   );
+  
   if (!res) {
     return response(500, {
       error: `unable to send from ${BACKUP_FAUCET_ADDRESS} to ${acc.address}`,
     });
   }
-
-  console.log(`faucet send res: ${JSON.stringify(res)}`);
 
   return response(200, {
     address: BACKUP_FAUCET_ADDRESS,
