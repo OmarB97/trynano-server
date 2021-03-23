@@ -3,9 +3,9 @@ const nano_client = require('@nanobox/nano-client');
 
 require('dotenv').config();
 
-const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
-  FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY,
-  FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
+const BACKUP_FAUCET_PUBLIC_KEY = process.env.BACKUP_FAUCET_PUBLIC_KEY,
+  BACKUP_FAUCET_PRIVATE_KEY = process.env.BACKUP_FAUCET_PRIVATE_KEY,
+  BACKUP_FAUCET_ADDRESS = process.env.BACKUP_FAUCET_ADDRESS,
   NANOBOX_USER = process.env.NANOBOX_USER,
   NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
 
@@ -40,9 +40,9 @@ exports.handler = async (event) => {
 
     // Get Faucet account info to check things like the current balance
     const accountInfo = await c.updateWalletAccount({
-      address: FAUCET_ADDRESS,
-      publicKey: FAUCET_PUBLIC_KEY,
-      privateKey: FAUCET_PRIVATE_KEY,
+      address: BACKUP_FAUCET_ADDRESS,
+      publicKey: BACKUP_FAUCET_PUBLIC_KEY,
+      privateKey: BACKUP_FAUCET_PRIVATE_KEY,
     });
 
     if (!accountInfo) {
@@ -123,7 +123,7 @@ async function returnAllNanoToFaucet() {
       };
 
       // now send all the nano in this wallet to the faucet
-      const sendRes = await c.sendMax(nanoAccount, FAUCET_ADDRESS);
+      const sendRes = await c.sendMax(nanoAccount, BACKUP_FAUCET_ADDRESS);
       if (!sendRes) {
         return {
           error: 'send operation returned undefined',
@@ -178,9 +178,9 @@ async function updateNanoBalanceInDB(address, updatedBalance) {
  */
 async function receivePendingFaucetTransactions() {
   const res = await c.update({
-    address: FAUCET_ADDRESS,
-    publicKey: FAUCET_PUBLIC_KEY,
-    privateKey: FAUCET_PRIVATE_KEY,
+    address: BACKUP_FAUCET_ADDRESS,
+    publicKey: BACKUP_FAUCET_PUBLIC_KEY,
+    privateKey: BACKUP_FAUCET_PRIVATE_KEY,
   });
 
   if (res.error) {
@@ -227,12 +227,12 @@ async function asyncForEach(array, callback) {
  * @returns {string} Error message
  */
 function validateState() {
-  if (!FAUCET_ADDRESS) {
-    return 'FAUCET_ADDRESS key missing from .env - you must fix';
-  } else if (!FAUCET_PUBLIC_KEY) {
-    return 'FAUCET_PUBLIC_KEY key missing from .env - you must fix';
-  } else if (!FAUCET_PRIVATE_KEY) {
-    return 'FAUCET_PRIVATE_KEY key missing from .env - you must fix';
+  if (!BACKUP_FAUCET_ADDRESS) {
+    return 'BACKUP_FAUCET_ADDRESS key missing from .env - you must fix';
+  } else if (!BACKUP_FAUCET_PUBLIC_KEY) {
+    return 'BACKUP_FAUCET_PUBLIC_KEY key missing from .env - you must fix';
+  } else if (!BACKUP_FAUCET_PRIVATE_KEY) {
+    return 'BACKUP_FAUCET_PRIVATE_KEY key missing from .env - you must fix';
   } else if (!NANOBOX_USER) {
     return 'NANOBOX_USER key missing from .env - you must fix';
   } else if (!NANOBOX_PASSWORD) {

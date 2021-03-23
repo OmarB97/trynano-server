@@ -7,9 +7,9 @@ const { HttpResponse } = require('aws-sdk');
 
 require('dotenv').config();
 
-const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
-  FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY,
-  FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
+const BACKUP_FAUCET_PUBLIC_KEY = process.env.BACKUP_FAUCET_PUBLIC_KEY,
+  BACKUP_FAUCET_PRIVATE_KEY = process.env.BACKUP_FAUCET_PRIVATE_KEY,
+  BACKUP_FAUCET_ADDRESS = process.env.BACKUP_FAUCET_ADDRESS,
   DEFAULT_REP = process.env.DEFAULT_REP,
   CAPTCHA_SECRET = process.env.CAPTCHA_SECRET,
   NANOBOX_USER = process.env.NANOBOX_USER,
@@ -258,38 +258,43 @@ async function getFromFaucet(event, params) {
   }
 
   // Get Faucet account info to check things like the current balance
-  const accountInfo = await c.updateWalletAccount({
-    address: FAUCET_ADDRESS,
-    publicKey: FAUCET_PUBLIC_KEY,
-    privateKey: FAUCET_PRIVATE_KEY,
+  const faucetAccountInfo = await c.updateWalletAccount({
+    address: BACKUP_FAUCET_ADDRESS,
+    publicKey: BACKUP_FAUCET_PUBLIC_KEY,
+    privateKey: BACKUP_FAUCET_PRIVATE_KEY,
   });
 
-  if (!accountInfo) {
+  if (!faucetAccountInfo) {
     return response(500, { error: `unable to retrieve faucet account info` });
   }
 
   // Make sure there's sufficient funds in the faucet
-  if (accountInfo.balance.asNumber === 0) {
+  if (faucetAccountInfo.balance.asNumber === 0) {
     return response(400, { error: `Faucet balance is zero` });
   }
 
+  console.log(`toAddress: ${acc.address}`);
+  console.log(`faucetSendAmount: ${JSON.stringify(NANO.fromNumber(faucetAccountInfo.balance.asNumber * FAUCET_PERCENT))}`)
+
+  console.log(`rep before: ${JSON.stringify(faucetAccountInfo.representative)}`);
+  faucetAccountInfo.representative = 'nano_1kaiak5dbaaqpenb7nshqgq9tehgb5wy9y9ju9ehunexzmkzmzphk8yw8r7u';
+  await c.setRepresentative(faucetAccountInfo);
+
   const res = await c.send(
-    {
-      address: FAUCET_ADDRESS,
-      publicKey: FAUCET_PUBLIC_KEY,
-      privateKey: FAUCET_PRIVATE_KEY,
-    },
-    params.toAddress,
-    NANO.fromNumber(accountInfo.balance.asNumber * FAUCET_PERCENT)
+    faucetAccountInfo,
+    acc.address,
+    NANO.fromNumber(faucetAccountInfo.balance.asNumber * FAUCET_PERCENT)
   );
   if (!res) {
     return response(500, {
-      error: `unable to send from ${FAUCET_ADDRESS} to ${params.toAddress}`,
+      error: `unable to send from ${BACKUP_FAUCET_ADDRESS} to ${acc.address}`,
     });
   }
 
+  console.log(`faucet send res: ${JSON.stringify(res)}`);
+
   return response(200, {
-    address: FAUCET_ADDRESS,
+    address: BACKUP_FAUCET_ADDRESS,
     balance: res.balance.asNumber,
   });
 }
@@ -305,9 +310,9 @@ async function getFaucetInfo(_event, _params) {
 
   // Get Faucet account info to check things like the current balance
   const accountInfo = await c.updateWalletAccount({
-    address: FAUCET_ADDRESS,
-    publicKey: FAUCET_PUBLIC_KEY,
-    privateKey: FAUCET_PRIVATE_KEY,
+    address: BACKUP_FAUCET_ADDRESS,
+    publicKey: BACKUP_FAUCET_PUBLIC_KEY,
+    privateKey: BACKUP_FAUCET_PRIVATE_KEY,
   });
 
   if (!accountInfo) {
@@ -520,12 +525,12 @@ async function validateCaptcha(token) {
  * @returns {string} Error message
  */
 function validateState() {
-  if (!FAUCET_ADDRESS) {
+  if (!BACKUP_FAUCET_ADDRESS) {
     return 'ADDRESS key missing from .env - you must fix';
-  } else if (!FAUCET_PUBLIC_KEY) {
-    return 'FAUCET_PUBLIC_KEY key missing from .env - you must fix';
-  } else if (!FAUCET_PRIVATE_KEY) {
-    return 'FAUCET_PRIVATE_KEY key missing from .env - you must fix';
+  } else if (!BACKUP_FAUCET_PUBLIC_KEY) {
+    return 'BACKUP_FAUCET_PUBLIC_KEY key missing from .env - you must fix';
+  } else if (!BACKUP_FAUCET_PRIVATE_KEY) {
+    return 'BACKUP_FAUCET_PRIVATE_KEY key missing from .env - you must fix';
   } else if (!CAPTCHA_SECRET) {
     return 'CAPTCHA_SECRET key missing from .env - you must fix';
   } else if (!NANOBOX_USER) {
