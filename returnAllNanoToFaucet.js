@@ -116,14 +116,19 @@ async function returnAllNanoToFaucet() {
     console.log('Start sending nano');
     await asyncForEach(res.Items, async (item) => {
       const wallet = AWS.DynamoDB.Converter.unmarshall(item);
-      const nanoAccount = {
+      const accountInfo = await c.updateWalletAccount({
         address: wallet.walletID,
         publicKey: wallet.publicKey,
         privateKey: wallet.privateKey,
-      };
+      });
 
-      // now send all the nano in this wallet to the faucet
-      const sendRes = await c.sendMax(nanoAccount, BACKUP_FAUCET_ADDRESS);
+      console.log(`Returning nano for accountInfo: ${JSON.stringify(accountInfo)}`);
+      if (accountInfo.balance.asNumber === 0) {
+        console.log("Can't send 0 nano, updating balance to 0 and skipping...");
+        await updateNanoBalanceInDB(accountInfo.address, accountInfo.balance.asString);
+      } else {
+// now send all the nano in this wallet to the faucet
+      const sendRes = await c.sendMax(accountInfo, BACKUP_FAUCET_ADDRESS);
       if (!sendRes) {
         return {
           error: 'send operation returned undefined',
@@ -132,7 +137,8 @@ async function returnAllNanoToFaucet() {
       const updatedBalance = sendRes.balance.asString;
 
       // finally, update the wallet balance in the database
-      await updateNanoBalanceInDB(nanoAccount.address, updatedBalance);
+      await updateNanoBalanceInDB(accountInfo.address, updatedBalance);
+      }
     });
     console.log('Done sending nano');
   };
