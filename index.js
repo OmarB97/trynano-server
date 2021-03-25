@@ -10,7 +10,6 @@ require('dotenv').config();
 const BACKUP_FAUCET_PUBLIC_KEY = process.env.BACKUP_FAUCET_PUBLIC_KEY,
   BACKUP_FAUCET_PRIVATE_KEY = process.env.BACKUP_FAUCET_PRIVATE_KEY,
   BACKUP_FAUCET_ADDRESS = process.env.BACKUP_FAUCET_ADDRESS,
-  DEFAULT_REP = process.env.DEFAULT_REP,
   CAPTCHA_SECRET = process.env.CAPTCHA_SECRET,
   NANOBOX_USER = process.env.NANOBOX_USER,
   NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
@@ -40,7 +39,6 @@ const c = new nano_client.NanoClient({
     username: NANOBOX_USER,
     password: NANOBOX_PASSWORD,
   },
-  defaultRepresentative: DEFAULT_REP,
 });
 
 const ddb = new AWS.DynamoDB({
@@ -278,7 +276,7 @@ async function getFromFaucet(event, params) {
     acc.address,
     NANO.fromNumber(faucetAccountInfo.balance.asNumber * FAUCET_PERCENT)
   );
-  
+
   if (!res) {
     return response(500, {
       error: `unable to send from ${BACKUP_FAUCET_ADDRESS} to ${acc.address}`,
