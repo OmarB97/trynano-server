@@ -230,9 +230,11 @@ async function receive(_event, params) {
  * @returns the faucet address and the updated faucet balance
  */
 async function getFromFaucet(event, params) {
+  // disable faucet until network is stable again (i.e. no more unconfirmed blocks in faucet account)
   return response(500, {
     error: `TryNano Faucet has been disabled until network is resolved. Please use second option, sorry!`,
   });
+  
   const acc = await loadNanoAccountFromDB(params.toAddress);
   if (!acc) {
     return response(400, {
