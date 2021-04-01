@@ -230,6 +230,9 @@ async function receive(_event, params) {
  * @returns the faucet address and the updated faucet balance
  */
 async function getFromFaucet(event, params) {
+  return response(500, {
+    error: `TryNano Faucet has been disabled until network is resolved. Please use second option, sorry!`,
+  });
   const acc = await loadNanoAccountFromDB(params.toAddress);
   if (!acc) {
     return response(400, {
@@ -297,7 +300,6 @@ async function getFromFaucet(event, params) {
  * @returns current faucet balance and payout percentage (decimal)
  */
 async function getFaucetInfo(_event, _params) {
-
   // Get Faucet account info to check things like the current balance
   const accountInfo = await c.updateWalletAccount({
     address: BACKUP_FAUCET_ADDRESS,
@@ -311,7 +313,7 @@ async function getFaucetInfo(_event, _params) {
 
   return response(200, {
     balance: accountInfo.balance.asNumber,
-    payout: FAUCET_PERCENT
+    payout: FAUCET_PERCENT,
   });
 }
 
@@ -432,8 +434,7 @@ async function checkFaucetEligibility(ipAddress) {
   }
   const ipHistoryData = AWS.DynamoDB.Converter.unmarshall(res.Item);
   const currNumInvokes = ipHistoryData.numFaucetInvocations + 1;
-  const numSecondsSinceLastInvoke =
-    (ts - ipHistoryData.lastUsedTs) / 1000;
+  const numSecondsSinceLastInvoke = (ts - ipHistoryData.lastUsedTs) / 1000;
   const numHoursSinceLastInvoke = numSecondsSinceLastInvoke / 3600;
 
   /*
