@@ -7,12 +7,13 @@ const { HttpResponse } = require('aws-sdk');
 
 require('dotenv').config();
 
-const BACKUP_FAUCET_PUBLIC_KEY = process.env.BACKUP_FAUCET_PUBLIC_KEY,
-  BACKUP_FAUCET_PRIVATE_KEY = process.env.BACKUP_FAUCET_PRIVATE_KEY,
-  BACKUP_FAUCET_ADDRESS = process.env.BACKUP_FAUCET_ADDRESS,
+const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
+  FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY,
+  FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
   CAPTCHA_SECRET = process.env.CAPTCHA_SECRET,
   NANOBOX_USER = process.env.NANOBOX_USER,
-  NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
+  NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD,
+  DISABLE_FAUCET = process.env.DISABLE_FAUCET;
 
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
@@ -230,11 +231,13 @@ async function receive(_event, params) {
  * @returns the faucet address and the updated faucet balance
  */
 async function getFromFaucet(event, params) {
-  // disable faucet until network is stable again (i.e. no more unconfirmed blocks in faucet account)
-  return response(500, {
-    error: `TryNano Faucet has been disabled until network is resolved. Please use second option, sorry!`,
-  });
-  
+  if (DISABLE_FAUCET) {
+    // disable faucet until network is stable again (i.e. no more unconfirmed blocks in faucet account)
+    return response(500, {
+      error: `TryNano Faucet has been disabled until network is fully resolved. Please use another option.`,
+    });
+  }
+
   const acc = await loadNanoAccountFromDB(params.toAddress);
   if (!acc) {
     return response(400, {
@@ -262,9 +265,9 @@ async function getFromFaucet(event, params) {
 
   // Get Faucet account info to check things like the current balance
   const faucetAccountInfo = await c.updateWalletAccount({
-    address: BACKUP_FAUCET_ADDRESS,
-    publicKey: BACKUP_FAUCET_PUBLIC_KEY,
-    privateKey: BACKUP_FAUCET_PRIVATE_KEY,
+    address: FAUCET_ADDRESS,
+    publicKey: FAUCET_PUBLIC_KEY,
+    privateKey: FAUCET_PRIVATE_KEY,
   });
 
   if (!faucetAccountInfo) {
@@ -284,12 +287,12 @@ async function getFromFaucet(event, params) {
 
   if (!res) {
     return response(500, {
-      error: `unable to send from ${BACKUP_FAUCET_ADDRESS} to ${acc.address}`,
+      error: `unable to send from ${FAUCET_ADDRESS} to ${acc.address}`,
     });
   }
 
   return response(200, {
-    address: BACKUP_FAUCET_ADDRESS,
+    address: FAUCET_ADDRESS,
     balance: res.balance.asNumber,
   });
 }
@@ -304,9 +307,9 @@ async function getFromFaucet(event, params) {
 async function getFaucetInfo(_event, _params) {
   // Get Faucet account info to check things like the current balance
   const accountInfo = await c.updateWalletAccount({
-    address: BACKUP_FAUCET_ADDRESS,
-    publicKey: BACKUP_FAUCET_PUBLIC_KEY,
-    privateKey: BACKUP_FAUCET_PRIVATE_KEY,
+    address: FAUCET_ADDRESS,
+    publicKey: FAUCET_PUBLIC_KEY,
+    privateKey: FAUCET_PRIVATE_KEY,
   });
 
   if (!accountInfo) {
@@ -518,12 +521,12 @@ async function validateCaptcha(token) {
  * @returns {string} Error message
  */
 function validateState() {
-  if (!BACKUP_FAUCET_ADDRESS) {
+  if (!FAUCET_ADDRESS) {
     return 'ADDRESS key missing from .env - you must fix';
-  } else if (!BACKUP_FAUCET_PUBLIC_KEY) {
-    return 'BACKUP_FAUCET_PUBLIC_KEY key missing from .env - you must fix';
-  } else if (!BACKUP_FAUCET_PRIVATE_KEY) {
-    return 'BACKUP_FAUCET_PRIVATE_KEY key missing from .env - you must fix';
+  } else if (!FAUCET_PUBLIC_KEY) {
+    return 'FAUCET_PUBLIC_KEY key missing from .env - you must fix';
+  } else if (!FAUCET_PRIVATE_KEY) {
+    return 'FAUCET_PRIVATE_KEY key missing from .env - you must fix';
   } else if (!CAPTCHA_SECRET) {
     return 'CAPTCHA_SECRET key missing from .env - you must fix';
   } else if (!NANOBOX_USER) {
