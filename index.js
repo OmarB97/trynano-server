@@ -12,8 +12,7 @@ const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
   FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
   CAPTCHA_SECRET = process.env.CAPTCHA_SECRET,
   NANOBOX_USER = process.env.NANOBOX_USER,
-  NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD,
-  DISABLE_FAUCET = process.env.DISABLE_FAUCET;
+  NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
 
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
@@ -32,7 +31,7 @@ const FAUCET_IP_HISTORY_EXPIRATION_TIME_SECONDS = 172800; // 48 hours
 const FAUCET_THROTTLE_DURATION_SECONDS = 600; // 10 minutes
 const FAUCET_INVOKE_LIMIT = 10;
 const FAUCET_RESET_TIME_HOURS = 24;
-const FAUCET_PERCENT = 0.00015;
+const FAUCET_PERCENT = 0.000125;
 
 const c = new nano_client.NanoClient({
   url: 'https://api.nanobox.cc',
@@ -231,7 +230,7 @@ async function receive(_event, params) {
  * @returns the faucet address and the updated faucet balance
  */
 async function getFromFaucet(event, params) {
-  if (DISABLE_FAUCET === true) {
+  if (process.env.DISABLE_FAUCET === 'true') {
     // disable faucet until network is stable again (i.e. no more unconfirmed blocks in faucet account)
     return response(500, {
       error: `TryNano Faucet has been disabled until network is fully resolved. Please use another option.`,
