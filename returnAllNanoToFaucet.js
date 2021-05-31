@@ -122,22 +122,27 @@ async function returnAllNanoToFaucet() {
         privateKey: wallet.privateKey,
       });
 
-      console.log(`Returning nano for accountInfo: ${JSON.stringify(accountInfo)}`);
+      console.log(
+        `Returning nano for accountInfo: ${JSON.stringify(accountInfo)}`
+      );
       if (accountInfo.balance.asNumber === 0) {
         console.log("Can't send 0 nano, updating balance to 0 and skipping...");
-        await updateNanoBalanceInDB(accountInfo.address, accountInfo.balance.asString);
+        await updateNanoBalanceInDB(
+          accountInfo.address,
+          accountInfo.balance.asString
+        );
       } else {
-// now send all the nano in this wallet to the faucet
-      const sendRes = await c.sendMax(accountInfo, FAUCET_ADDRESS);
-      if (!sendRes) {
-        return {
-          error: 'send operation returned undefined',
-        };
-      }
-      const updatedBalance = sendRes.balance.asString;
+        // now send all the nano in this wallet to the faucet
+        const sendRes = await c.sendMax(accountInfo, FAUCET_ADDRESS);
+        if (!sendRes) {
+          return {
+            error: 'send operation returned undefined',
+          };
+        }
+        const updatedBalance = sendRes.balance.asString;
 
-      // finally, update the wallet balance in the database
-      await updateNanoBalanceInDB(accountInfo.address, updatedBalance);
+        // finally, update the wallet balance in the database
+        await updateNanoBalanceInDB(accountInfo.address, updatedBalance);
       }
     });
     console.log('Done sending nano');
