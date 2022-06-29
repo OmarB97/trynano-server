@@ -10,9 +10,7 @@ require('dotenv').config();
 const FAUCET_PUBLIC_KEY = process.env.FAUCET_PUBLIC_KEY,
   FAUCET_PRIVATE_KEY = process.env.FAUCET_PRIVATE_KEY,
   FAUCET_ADDRESS = process.env.FAUCET_ADDRESS,
-  CAPTCHA_SECRET = process.env.CAPTCHA_SECRET,
-  NANOBOX_USER = process.env.NANOBOX_USER,
-  NANOBOX_PASSWORD = process.env.NANOBOX_PASSWORD;
+  CAPTCHA_SECRET = process.env.CAPTCHA_SECRET;
 
 const DDB_WALLET_TABLE_NAME = 'TryNanoWallets';
 const DDB_FAUCET_IP_HISTORY_TABLE_NAME = 'FaucetIpHistory';
@@ -34,11 +32,7 @@ const FAUCET_RESET_TIME_HOURS = 24;
 const FAUCET_PERCENT = 0.000125;
 
 const c = new nano_client.NanoClient({
-  url: 'https://api.nanobox.cc',
-  credentials: {
-    username: NANOBOX_USER,
-    password: NANOBOX_PASSWORD,
-  },
+  url: 'https://proxy.powernode.cc/proxy',
 });
 
 const ddb = new AWS.DynamoDB({
@@ -528,12 +522,7 @@ function validateState() {
     return 'FAUCET_PRIVATE_KEY key missing from .env - you must fix';
   } else if (!CAPTCHA_SECRET) {
     return 'CAPTCHA_SECRET key missing from .env - you must fix';
-  } else if (!NANOBOX_USER) {
-    return 'NANOBOX_USER key missing from .env - you must fix';
-  } else if (!NANOBOX_PASSWORD) {
-    return 'NANOBOX_PASSWORD key missing from .env - you must fix';
   }
-
   return null;
 }
 /* 
